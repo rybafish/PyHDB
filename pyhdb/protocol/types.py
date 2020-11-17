@@ -486,6 +486,60 @@ class Timestamp(Type):
         pfield += cls._struct.pack(year, month, value.day, hour, value.minute, millisecond)
         return pfield
 
+class Longdate(Type):
+
+    type_code = type_codes.LONGDATE
+    python_type = datetime.datetime
+    _struct = struct.Struct("<Q")
+
+    @classmethod
+    def from_resultset(cls, payload, connection=None):
+    
+        [microsec] = cls._struct.unpack(payload.read(8))
+        
+        if microsec == 3155380704000000001:
+            return None
+            
+        microsec = microsec // 10
+        
+        second, microsec = divmod(microsec, 1000000)
+        
+        date, time = divmod(second, 60*60*24)
+        
+        hours, seconds = divmod(time, 60*60)
+        minutes, seconds  = divmod(seconds, 60)
+        
+        date = datetime.date.fromordinal(date - 1)
+        time = datetime.time(hours, minutes, seconds, microsec)
+                
+        return datetime.datetime.combine(date, time)
+
+    @classmethod
+    def to_sql(cls, value):
+        return "'%s'" % value.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    @classmethod
+    def prepare(cls, value):
+        """Pack datetime value into proper binary format"""
+        pfield = struct.pack('b', cls.type_code)
+        
+        if isinstance(value, string_types):
+            # implicit casting from 
+            if "." in value:
+                value = datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f")
+            else:
+                value = datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+
+        date = datetime.date.toordinal(value.date()) + 1
+        
+        (hours, minutes, seconds, microseconds) = (value.hour, value.minute, value.second, value.microsecond)
+        
+        time = ((((hours * 60) + minutes) * 60 + seconds ) * 1000000 + microseconds) * 10 + 1# microseconds since midnight
+
+        val = date * 60*60*24*10000000 + time
+        
+        pfield += cls._struct.pack(val)
+        return pfield
 
 class MixinLobType(object):
     """Mixin class for all LOB types"""
