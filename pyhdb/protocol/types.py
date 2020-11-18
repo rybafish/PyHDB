@@ -516,7 +516,7 @@ class Longdate(Type):
 
     @classmethod
     def to_sql(cls, value):
-        return "'%s'" % value.strftime("%Y-%m-%d %H:%M:%S.%f")
+        return "'%s'" % value.isoformat(' ')
 
     @classmethod
     def prepare(cls, value):
