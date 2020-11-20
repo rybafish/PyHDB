@@ -597,6 +597,56 @@ class Longdate(Type):
         pfield += cls._struct.pack(val)
         return pfield
 
+class Seconddate(Type):
+
+    type_code = type_codes.SECONDDATE
+    python_type = datetime.datetime
+    _struct = struct.Struct("<Q")
+
+    @classmethod
+    def from_resultset(cls, payload, connection=None):
+    
+        [second] = cls._struct.unpack(payload.read(8))
+        
+        if second == 315538070401:
+            return None
+            
+        date, time = divmod(second, 60*60*24)
+        
+        hours, seconds = divmod(time, 60*60)
+        minutes, seconds  = divmod(seconds, 60)
+        
+        date = datetime.date.fromordinal(date - 1)
+        time = datetime.time(hours, minutes, seconds)
+        
+        return datetime.datetime.combine(date, time)
+
+    @classmethod
+    def to_sql(cls, value):
+        return "'%s'" % value.isoformat(' ')
+
+    @classmethod
+    def prepare(cls, value):
+        """Pack datetime value into proper binary format"""
+        
+        pfield = struct.pack('b', cls.type_code)
+        
+        if isinstance(value, string_types):
+            # implicit casting from 
+            value = datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+
+        date = datetime.date.toordinal(value.date()) + 1
+        
+        (hours, minutes, seconds) = (value.hour, value.minute, value.second)
+        
+        time = (((hours * 60) + minutes) * 60 + seconds ) + 1 # seconds since midnight
+
+        val = date * 60*60*24 + time
+        
+        pfield += cls._struct.pack(val)
+        
+        return pfield
+
 class MixinLobType(object):
     """Mixin class for all LOB types"""
     type_code = None
