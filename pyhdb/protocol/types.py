@@ -769,6 +769,15 @@ class NClobType(Type, MixinLobType):
         """Return value if it is a string, otherwise properly encode unicode to binary unicode string"""
         return value.encode('utf8') if isinstance(value, text_type) else value
 
+class TextType(Type, MixinLobType):
+    """Text type class"""
+    type_code = type_codes.TEXT
+
+    @classmethod
+    def encode_value(cls, value):
+        """Return value if it is a string, otherwise properly encode unicode to binary unicode string"""
+        return value.encode('utf8') if isinstance(value, text_type) else value
+
 
 class BlobType(Type, MixinLobType):
     """BLOB type class"""
