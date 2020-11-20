@@ -647,6 +647,85 @@ class Seconddate(Type):
         
         return pfield
 
+class Daydate(Type):
+
+    type_code = type_codes.DAYDATE
+    python_type = datetime.date
+    _struct = struct.Struct("<L")
+
+    @classmethod
+    def from_resultset(cls, payload, connection=None):
+    
+        [day] = cls._struct.unpack(payload.read(4))
+        
+        if day == 3652062:
+            return None
+            
+        date = datetime.date.fromordinal(day - 2) # python uses 737425 while SAP HANA substracts 1721423
+        
+        return date
+
+    @classmethod
+    def to_sql(cls, value):
+        return "'%s'" % value.isoformat()
+
+    @classmethod
+    def prepare(cls, value):
+        """Pack date value into proper binary format"""
+        
+        pfield = struct.pack('b', cls.type_code)
+        
+        if isinstance(value, string_types):
+            # implicit casting from 
+            value = datetime.date.strptime(value, "%Y-%m-%d")
+
+        day = datetime.date.toordinal(value) + 2
+        
+        pfield += cls._struct.pack(day)
+        
+        return pfield
+
+class Secondtime(Type):
+
+    type_code = type_codes.SECONDTIME
+    python_type = datetime.time
+    _struct = struct.Struct("<L")
+
+    @classmethod
+    def from_resultset(cls, payload, connection=None):
+    
+        [second] = cls._struct.unpack(payload.read(4))
+        
+        if second == 86401:
+            return None
+
+        second -= 1
+        
+        hours, seconds = divmod(second, 60*60)
+        minutes, seconds  = divmod(seconds, 60)
+        
+        return datetime.time(hours, minutes, seconds)
+
+    @classmethod
+    def to_sql(cls, value):
+        return "'%s'" % value.isoformat()
+
+    @classmethod
+    def prepare(cls, value):
+        """Pack date value into proper binary format"""
+        
+        pfield = struct.pack('b', cls.type_code)
+        
+        if isinstance(value, string_types):
+            # implicit casting from 
+            value = datetime.time.strptime(value, "%H:%M:%S")
+
+        seconds = (value.hour * 60 + value.minute) * 60 + value.second
+        
+        pfield += cls._struct.pack(seconds + 1)
+        
+        return pfield
+
 class MixinLobType(object):
     """Mixin class for all LOB types"""
     type_code = None
