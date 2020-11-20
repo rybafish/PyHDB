@@ -320,6 +320,62 @@ class String(Type, MixinStringType):
             value
         )
 
+class Alphanum(Type):
+
+    type_code = type_codes.ALPHANUM
+    
+    python_type = string_types
+
+    ESCAPE_REGEX = re.compile(r"[\']")
+    ESCAPE_MAP = {"'": "''"}
+
+    @classmethod
+    def from_resultset(cls, payload, connection=None):
+
+        length = struct.unpack('B', payload.read(1))[0]
+
+        if length == 255:
+            return None
+
+        val_len = struct.unpack('B', payload.read(1))[0]
+            
+        val =  payload.read(length - 1).decode('cesu-8') # ascii ?
+        
+        if val_len & 128: # numeric to be filled with zeroes
+            val_len &= 127
+            val = val.zfill(val_len)
+        
+        return val
+        
+    @classmethod
+    def prepare(cls, value):
+    
+        if value is None:
+            # length indicator
+            pfield = struct.pack('B', 255)
+            
+            return
+
+        pfield = struct.pack('b', cls.type_code)
+                
+        value = value.encode('cesu-8')
+        length = len(value) 
+        
+        if length > 127:
+            raise InterfaceError("ALPHANUM value cannot be longer 127 characters: %s... (%i bytes)" % (str(value[:16]), length))
+
+        pfield += struct.pack('b', len(value))
+        pfield += value
+            
+        return pfield
+
+    @classmethod
+    def to_sql(cls, value):
+        return "'%s'" % cls.ESCAPE_REGEX.sub(
+            lambda match: cls.ESCAPE_MAP.get(match.group(0)),
+            value
+        )
+
 
 class Binary(Type, MixinStringType):
 
