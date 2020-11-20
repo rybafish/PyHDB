@@ -307,7 +307,8 @@ class MixinStringType(object):
 class String(Type, MixinStringType):
 
     type_code = (type_codes.CHAR, type_codes.VARCHAR, type_codes.NCHAR, type_codes.NVARCHAR,
-                 type_codes.STRING, type_codes.NSTRING)
+                 type_codes.STRING, type_codes.NSTRING
+                 , type_codes.SHORTTEXT)
     python_type = string_types
 
     ESCAPE_REGEX = re.compile(r"[\']")
