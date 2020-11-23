@@ -613,10 +613,10 @@ class Seconddate(Type):
     
         [second] = cls._struct.unpack(payload.read(8))
         
-        second -= 1
-        
         if second == 315538070401:
             return None
+
+        second -= 1
             
         date, time = divmod(second, 60*60*24)
         
@@ -630,7 +630,7 @@ class Seconddate(Type):
 
     @classmethod
     def to_sql(cls, value):
-        return "'%s'" % value.isoformat(' ')
+        return "'%s'" % value.isoformat(' ', 'seconds')
 
     @classmethod
     def prepare(cls, value):
