@@ -358,6 +358,10 @@ class Alphanum(Type):
             return
 
         pfield = struct.pack('b', cls.type_code)
+
+        if isinstance(value, int):
+            #implicit cast to str
+            value = str(value)
                 
         value = value.encode('cesu-8')
         length = len(value) 
@@ -678,7 +682,7 @@ class Daydate(Type):
         
         if isinstance(value, string_types):
             # implicit casting from 
-            value = datetime.date.strptime(value, "%Y-%m-%d")
+            value = datetime.datetime.strptime(value, "%Y-%m-%d")
 
         day = datetime.date.toordinal(value) + 2
         
@@ -697,10 +701,10 @@ class Secondtime(Type):
     
         [second] = cls._struct.unpack(payload.read(4))
         
+        second -= 1
+
         if second == 86401:
             return None
-
-        second -= 1
         
         hours, seconds = divmod(second, 60*60)
         minutes, seconds  = divmod(seconds, 60)
@@ -719,7 +723,7 @@ class Secondtime(Type):
         
         if isinstance(value, string_types):
             # implicit casting from 
-            value = datetime.time.strptime(value, "%H:%M:%S")
+            value = datetime.datetime.strptime(value, "%H:%M:%S")
 
         seconds = (value.hour * 60 + value.minute) * 60 + value.second
         
