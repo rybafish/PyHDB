@@ -613,6 +613,8 @@ class Seconddate(Type):
     
         [second] = cls._struct.unpack(payload.read(8))
         
+        second -= 1
+        
         if second == 315538070401:
             return None
             
