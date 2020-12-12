@@ -110,7 +110,7 @@ def test_to_daydate(input, expected):
 # ########################## Test value packing #####################################
 
 @pytest.mark.parametrize("input,expected", [
-    ('8', b'\x37\x01\x38\x00\x00\x00\x00\x00'),
+    ('8', b'\x37\x01\x38')
 ])
 def test_pack_alphanum(input, expected):
         assert types.Alphanum.prepare(input) == expected
