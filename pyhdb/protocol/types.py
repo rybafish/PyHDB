@@ -91,8 +91,13 @@ class NoneType(Type):
     @classmethod
     def prepare(cls, type_code):
         """Prepare a binary NULL value for given type code"""
-        # This is achieved by setting the MSB of the type_code byte to 1
-        return struct.pack('<B', type_code | 0x80)
+        
+        if type_code != type_codes.SECONDTIME:
+            # This is achieved by setting the MSB of the type_code byte to 1
+            return struct.pack('<B', type_code | 0x80)
+        else:
+            # Apparently, SECONDTIME(64) has special null value
+            return(by_type_code[type_code].prepare(None))
 
 
 class _IntType(Type):
@@ -351,17 +356,10 @@ class Alphanum(Type):
     @classmethod
     def prepare(cls, value):
     
-        if value is None:
-            # length indicator
-            pfield = struct.pack('B', 255)
-            
-            return
-
         pfield = struct.pack('b', cls.type_code)
 
         if isinstance(value, int):
-            #implicit cast to str
-            value = str(value)
+            raise InterfaceError("INT is not compatible with ALPHANUM")
                 
         value = value.encode('cesu-8')
         length = len(value) 
@@ -584,6 +582,11 @@ class Longdate(Type):
         """Pack datetime value into proper binary format"""
         pfield = struct.pack('b', cls.type_code)
         
+        if value is None:
+            val = 3155380704000000001
+            pfield += cls._struct.pack(val)
+            return pfield
+        
         if isinstance(value, string_types):
             # implicit casting from 
             if "." in value:
@@ -728,11 +731,11 @@ class Secondtime(Type):
             value = datetime.datetime.strptime(value, "%H:%M:%S")
 
         seconds = (value.hour * 60 + value.minute) * 60 + value.second
-        
+            
         pfield += cls._struct.pack(seconds + 1)
         
         return pfield
-
+        
 class MixinLobType(object):
     """Mixin class for all LOB types"""
     type_code = None
