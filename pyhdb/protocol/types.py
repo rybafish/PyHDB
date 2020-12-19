@@ -97,7 +97,11 @@ class NoneType(Type):
             return struct.pack('<B', type_code | 0x80)
         else:
             # Apparently, SECONDTIME(64) has special null value
-            return(by_type_code[type_code].prepare(None))
+
+            pfield = struct.pack('b', type_code)
+            pfield += struct.Struct("<L").pack(86401)
+
+            return(pfield)
 
 
 class _IntType(Type):
@@ -729,7 +733,7 @@ class Secondtime(Type):
         if isinstance(value, string_types):
             # implicit casting from 
             value = datetime.datetime.strptime(value, "%H:%M:%S")
-
+            
         seconds = (value.hour * 60 + value.minute) * 60 + value.second
             
         pfield += cls._struct.pack(seconds + 1)

@@ -17,7 +17,18 @@ from datetime import datetime, time, date
 
 import pytest
 from pyhdb.protocol import types
+from pyhdb.protocol.constants import type_codes
 
+
+# ########################## Test NoneType packing extention ##########################
+
+@pytest.mark.parametrize("given,expected", [
+    (type_codes.LONGDATE, b"\xbd"),
+    (type_codes.SECONDTIME, b"\x40\x81\x51\x01\x00"),
+])
+
+def test_none_pack(given, expected):
+    assert types.NoneType.prepare(given) == expected
 
 # ########################## Test value unpacking #####################################
 
