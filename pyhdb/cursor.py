@@ -370,34 +370,38 @@ class Cursor(object):
         """Handle reply messages from STORED PROCEDURE statements"""
         for part in parts:
             if part.kind == part_kinds.ROWSAFFECTED:
-                #print('ROWSAFFECTED')
                 self.rowcount = part.values[0]
             elif part.kind == part_kinds.TRANSACTIONFLAGS:
                 pass
             elif part.kind == part_kinds.STATEMENTCONTEXT:
                 pass
             elif part.kind == part_kinds.OUTPUTPARAMETERS:
-                #print('OUTPUTPARAMETERS ?? <<< ')
                 self._buffer = part.unpack_rows(parameters_metadata, self.connection)
                 self._received_last_resultset_part = True
                 self._executed = True
+
+                #requred in case of scalar output parameters
+                self._buffer_list.append(self._buffer)
+                self._resultset_id_list.append(None)
+                self._received_last_resultset_part_list.append(self._received_last_resultset_part)
+                self._executed_list.append(self._executed)
+
             elif part.kind == part_kinds.RESULTSETMETADATA:
-                #print('RESULTSETMETADATA')
                 
                 description, _column_types = self._handle_result_metadata(part)
 
-                resultset_number = len(self.description_list)
+                resultset_number = len(self._buffer_list)
                 
                 if resultset_number == 0:
                     #first resultset metadata
                      self.description = description
                      self._column_types = _column_types 
                     
-                #populate list entries
+                #populate list entries to be filled in RESULTSET and RESULTSETID
                 self.description_list.append(description)
                 self._column_types_list.append(_column_types)
                 
-                self._resultset_id_list.append(None)
+                self._resultset_id_list.append(None) #init the entry with something
                 self._executed_list.append(False)
                 self._received_last_resultset_part_list.append(False)
                 
@@ -407,27 +411,31 @@ class Cursor(object):
                     self._buffer_list.append(iter([]))
                     
             elif part.kind == part_kinds.RESULTSETID:
-                #print('RESULTSETID')
                 
                 resultset_number = len(self._resultset_id_list) - 1
+
+                if resultset_number < 0:
+                    raise ProgrammingError('Multiple resultset processing error in RESULTSETID')
                 
-                if not (self._resultset_id_list):
+                #if not (self._resultset_id_list):
+                if resultset_number == 0:
                     self._resultset_id = part.value
                     
                 self._resultset_id_list[resultset_number] = part.value
 
             elif part.kind == part_kinds.RESULTSET:
-                #print('RESULTSET')
-                self._buffer = part.unpack_rows(self._column_types, self.connection)
+                resultset_number = len(self._buffer_list) - 1
+                
+                if resultset_number < 0:
+                    raise ProgrammingError('Multiple resultset processing error in RESULTSET')
+                
+                self._buffer = part.unpack_rows(self._column_types_list[resultset_number - 1], self.connection)
                 self._received_last_resultset_part = part.attribute & 1
                 self._executed = True
                 
-                resultset_number = len(self._resultset_id_list) - 1
-                
-                if resultset_number == 0:
-                    self._buffer_list[resultset_number] = self._buffer
-                    self._executed_list[resultset_number] = True
-                    self._received_last_resultset_part_list[resultset_number] = part.attribute & 1
+                self._buffer_list[resultset_number] = self._buffer
+                self._executed_list[resultset_number] = True
+                self._received_last_resultset_part_list[resultset_number] = part.attribute & 1
             else:
                 raise InterfaceError("Stored procedure call, unexpected part kind %d." % part.kind)
         self._executed = True
@@ -457,20 +465,25 @@ class Cursor(object):
 
         result = []
         cnt = 0
+
+        if result_set_num == 0 and len(self._buffer_list) == 0:
+            #fake a list... mostly because of the scalar output
+            
+            print('--------------- DOES THIS EVER HAPPEN???? -------------------------')
+            
+            self._buffer_list.append(self._buffer)
+            self._received_last_resultset_part_list.append(self._received_last_resultset_part)
+            self._resultset_id_list.append(None)
                 
         while cnt != size:
             try:
-                #print('try', result_set_num, self._buffer_list[result_set_num])
                 result.append(next(self._buffer_list[result_set_num]))
                 cnt += 1
             except StopIteration:
-                #print('except StopIteration,', cnt)
-                #print(result)
                 break
 
         if cnt == size or self._received_last_resultset_part_list[result_set_num]:
             # No rows are missing or there are no additional rows
-            #print('No rows are missing', cnt, size)
             return result
 
         request = RequestMessage.new(
