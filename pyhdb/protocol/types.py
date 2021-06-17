@@ -563,6 +563,8 @@ class Longdate(Type):
         if microsec == 3155380704000000001:
             return None
             
+        microsec -= 1
+            
         microsec = microsec // 10
         
         second, microsec = divmod(microsec, 1000000)
