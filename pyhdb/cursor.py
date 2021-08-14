@@ -206,6 +206,9 @@ class Cursor(object):
             elif function_code == function_codes.DDL:
                 # No additional handling is required
                 pass
+            elif function_code in (function_codes.COMMIT, function_codes.ROLLBACK):
+                # No additional handling is required
+                pass
             elif function_code in (function_codes.DBPROCEDURECALL, function_codes.DBPROCEDURECALLWITHRESULT):
                 self._handle_dbproc_call(parts, prepared_statement._params_metadata) # resultset metadata set in prepare
             else:
