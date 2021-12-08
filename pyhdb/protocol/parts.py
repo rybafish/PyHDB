@@ -143,7 +143,11 @@ class Part(with_metaclass(PartMeta, object)):
             debug('%s (%d/%d): %s', _PartClass.__name__, num_part+1, expected_parts, str(part_header))
             debug('Read %d bytes payload for part %d', part_payload_size, num_part + 1)
 
-            init_arguments = _PartClass.unpack_data(part_header.argument_count, part_payload)
+            if part_header.part_kind == constants.part_kinds.RESULTSET and part_header.bigargument_count > 0:
+                init_arguments = _PartClass.unpack_data(part_header.bigargument_count, part_payload)
+            else:
+                init_arguments = _PartClass.unpack_data(part_header.argument_count, part_payload)
+                
             debug('Part data: %s', init_arguments)
             part = _PartClass(*init_arguments)
             part.header = part_header
