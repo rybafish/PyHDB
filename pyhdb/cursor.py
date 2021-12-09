@@ -489,7 +489,7 @@ class Cursor(object):
             # No rows are missing or there are no additional rows
             return result
 
-        while not self._received_last_resultset_part:
+        while not self._received_last_resultset_part and cnt < size:
 
             request = RequestMessage.new(
                 self.connection,
@@ -503,6 +503,9 @@ class Cursor(object):
             resultset_part = response.segments[0].parts[1]
             if resultset_part.attribute & 1:
                 self._received_last_resultset_part = True
+                
+            cnt += resultset_part.num_rows
+            
             result.extend(resultset_part.unpack_rows(self._column_types_list[result_set_num], self.connection))
             
         return result
