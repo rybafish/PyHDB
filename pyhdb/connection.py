@@ -27,6 +27,9 @@ from pyhdb.protocol.message import RequestMessage, ReplyMessage
 from pyhdb.protocol.parts import ClientId, ConnectOptions
 from pyhdb.protocol.constants import message_types, function_codes, DEFAULT_CONNECTION_OPTIONS
 
+### ssl support library
+import ssl
+
 INITIALIZATION_BYTES = bytearray([
     255, 255, 255, 255, 4, 20, 0, 4, 1, 0, 0, 1, 1, 1
 ])
@@ -63,7 +66,21 @@ class Connection(object):
         return '<Hana connection host=%s port=%s user=%s>' % (self.host, self.port, self.user)
 
     def _open_socket_and_init_protocoll(self):
-        self._socket = socket.create_connection((self.host, self.port), self._timeout)
+        # CREATE SOCKET
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
+
+        # SSL Context
+        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        # context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1  # optional
+        context.verify_mode = ssl.CERT_NONE
+        context.set_default_verify_paths()
+
+        # WRAP SOCKET
+        self._socket = context.wrap_socket(sock, server_hostname=self.host)
+
+        # self._socket = wrappedSocket.create_connection((self.host, self.port), self._timeout)
+        self._socket.connect((self.host, self.port))
 
         # Initialization Handshake
         self._socket.sendall(INITIALIZATION_BYTES)
