@@ -126,6 +126,15 @@ class Cursor(object):
         self.arraysize = 1
         self._prepared_statements = {}
 
+        #multiple result sets support
+        self._column_types_list = []
+        self.description_list = []
+        self._resultset_id_list = []
+        
+        self._executed_list = []
+        self._buffer_list = []
+        self._received_last_resultset_part_list = []
+
     @property
     def prepared_statement_ids(self):
         return self._prepared_statements.keys()
@@ -341,6 +350,17 @@ class Cursor(object):
                 self._buffer = part.unpack_rows(self._column_types, self.connection)
                 self._received_last_resultset_part = part.attribute & 1
                 self._executed = True
+                
+                #make same interface as multiple resultsets provide
+                
+                self.description_list.append(self.description)
+                self._column_types_list.append(self._column_types)
+                
+                self._buffer_list.append(self._buffer)
+                self._resultset_id_list.append(self._resultset_id)
+                self._received_last_resultset_part_list.append(self._received_last_resultset_part)
+                self._executed_list.append(self._executed)
+                
             elif part.kind in (part_kinds.STATEMENTCONTEXT, part_kinds.TRANSACTIONFLAGS, part_kinds.PARAMETERMETADATA):
                 pass
             else:
@@ -359,14 +379,63 @@ class Cursor(object):
                 self._buffer = part.unpack_rows(parameters_metadata, self.connection)
                 self._received_last_resultset_part = True
                 self._executed = True
+
+                #requred in case of scalar output parameters
+                self._buffer_list.append(self._buffer)
+                self._resultset_id_list.append(None)
+                self._received_last_resultset_part_list.append(self._received_last_resultset_part)
+                self._executed_list.append(self._executed)
+
             elif part.kind == part_kinds.RESULTSETMETADATA:
-                self.description, self._column_types = self._handle_result_metadata(part)
+                
+                description, _column_types = self._handle_result_metadata(part)
+
+                resultset_number = len(self._buffer_list)
+                
+                if resultset_number == 0:
+                    #first resultset metadata
+                     self.description = description
+                     self._column_types = _column_types 
+                    
+                #populate list entries to be filled in RESULTSET and RESULTSETID
+                self.description_list.append(description)
+                self._column_types_list.append(_column_types)
+                
+                self._resultset_id_list.append(None) #init the entry with something
+                self._executed_list.append(False)
+                self._received_last_resultset_part_list.append(False)
+                
+                if resultset_number == 0:
+                    self._buffer_list.append(self._buffer)
+                else:
+                    self._buffer_list.append(iter([]))
+                    
             elif part.kind == part_kinds.RESULTSETID:
-                self._resultset_id = part.value
+                
+                resultset_number = len(self._resultset_id_list) - 1
+
+                if resultset_number < 0:
+                    raise ProgrammingError('Multiple resultset processing error in RESULTSETID')
+                
+                #if not (self._resultset_id_list):
+                if resultset_number == 0:
+                    self._resultset_id = part.value
+                    
+                self._resultset_id_list[resultset_number] = part.value
+
             elif part.kind == part_kinds.RESULTSET:
-                self._buffer = part.unpack_rows(self._column_types, self.connection)
+                resultset_number = len(self._buffer_list) - 1
+                
+                if resultset_number < 0:
+                    raise ProgrammingError('Multiple resultset processing error in RESULTSET')
+                
+                self._buffer = part.unpack_rows(self._column_types_list[resultset_number - 1], self.connection)
                 self._received_last_resultset_part = part.attribute & 1
                 self._executed = True
+                
+                self._buffer_list[resultset_number] = self._buffer
+                self._executed_list[resultset_number] = True
+                self._received_last_resultset_part_list[resultset_number] = part.attribute & 1
             else:
                 raise InterfaceError("Stored procedure call, unexpected part kind %d." % part.kind)
         self._executed = True
@@ -383,27 +452,37 @@ class Cursor(object):
 
         return tuple(description), tuple(column_types)
 
-    def fetchmany(self, size=None):
+    def fetchmany(self, size=None, result_set_num = 0):
         """Fetch many rows from select result set.
         :param size: Number of rows to return.
         :returns: list of row records (tuples)
         """
         self._check_closed()
-        if not self._executed:
+        if False and not self._executed:
             raise ProgrammingError("Require execute() first")
         if size is None:
             size = self.arraysize
 
         result = []
         cnt = 0
+
+        if result_set_num == 0 and len(self._buffer_list) == 0:
+            #fake a list... mostly because of the scalar output
+            
+            print('--------------- DOES THIS EVER HAPPEN???? -------------------------')
+            
+            self._buffer_list.append(self._buffer)
+            self._received_last_resultset_part_list.append(self._received_last_resultset_part)
+            self._resultset_id_list.append(None)
+                
         while cnt != size:
             try:
-                result.append(next(self._buffer))
+                result.append(next(self._buffer_list[result_set_num]))
                 cnt += 1
             except StopIteration:
                 break
 
-        if cnt == size or self._received_last_resultset_part:
+        if cnt == size or self._received_last_resultset_part_list[result_set_num]:
             # No rows are missing or there are no additional rows
             return result
 
@@ -411,7 +490,7 @@ class Cursor(object):
             self.connection,
             RequestSegment(
                 message_types.FETCHNEXT,
-                (ResultSetId(self._resultset_id), FetchSize(size - cnt))
+                (ResultSetId(self._resultset_id_list[result_set_num]), FetchSize(size - cnt))
             )
         )
         response = self.connection.send_request(request)
@@ -419,7 +498,7 @@ class Cursor(object):
         resultset_part = response.segments[0].parts[1]
         if resultset_part.attribute & 1:
             self._received_last_resultset_part = True
-        result.extend(resultset_part.unpack_rows(self._column_types, self.connection))
+        result.extend(resultset_part.unpack_rows(self._column_types_list[result_set_num], self.connection))
         return result
 
     def fetchone(self):
