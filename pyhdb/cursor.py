@@ -489,19 +489,26 @@ class Cursor(object):
             # No rows are missing or there are no additional rows
             return result
 
-        request = RequestMessage.new(
-            self.connection,
-            RequestSegment(
-                message_types.FETCHNEXT,
-                (ResultSetId(self._resultset_id_list[result_set_num]), FetchSize(size - cnt))
-            )
-        )
-        response = self.connection.send_request(request)
+        while not self._received_last_resultset_part_list[result_set_num] and cnt < size:
 
-        resultset_part = response.segments[0].parts[1]
-        if resultset_part.attribute & 1:
-            self._received_last_resultset_part = True
-        result.extend(resultset_part.unpack_rows(self._column_types_list[result_set_num], self.connection))
+            request = RequestMessage.new(
+                self.connection,
+                RequestSegment(
+                    message_types.FETCHNEXT,
+                    (ResultSetId(self._resultset_id_list[result_set_num]), FetchSize(size - cnt))
+                )
+            )
+            response = self.connection.send_request(request)
+
+            resultset_part = response.segments[0].parts[1]
+            if resultset_part.attribute & 1:
+                self._received_last_resultset_part_list[result_set_num] = True
+                self._received_last_resultset_part = True
+                
+            cnt += resultset_part.num_rows
+            
+            result.extend(resultset_part.unpack_rows(self._column_types_list[result_set_num], self.connection))
+            
         return result
 
     def fetchone(self):
