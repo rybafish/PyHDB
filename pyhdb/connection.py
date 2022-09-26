@@ -40,7 +40,7 @@ class Connection(object):
     """
     Database connection class
     """
-    def __init__(self, host, port, user, password, autocommit=False, timeout=None, data_format_version2 = False):
+    def __init__(self, host, port, user, password, autocommit=False, timeout=None, data_format_version2 = False, ssl = None):
         self.host = host
         self.port = port
         self.user = user
@@ -56,6 +56,8 @@ class Connection(object):
         self._timeout = timeout
         
         self._data_format_version2 = data_format_version2
+        self._ssl = ssl
+        
         self._auth_manager = AuthManager(self, user, password)
         # It feels like the RLock has a poorer performance
         self._socket_lock = threading.RLock()
@@ -65,8 +67,32 @@ class Connection(object):
         return '<Hana connection host=%s port=%s user=%s>' % (self.host, self.port, self.user)
 
     def _open_socket_and_init_protocoll(self):
-        self._socket = socket.create_connection((self.host, self.port), self._timeout)
 
+        if not self._ssl:
+            #old style, no SSL
+            self._socket = socket.create_connection((self.host, self.port), self._timeout)
+        else:
+
+            # CREATE SOCKET
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            
+            if self._timeout:
+                sock.settimeout(self._timeout)
+
+            # SSL Context
+            context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            
+            # context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1  # optional
+            context.verify_mode = ssl.CERT_NONE
+            context.set_default_verify_paths()
+
+            # WRAP SOCKET
+            self._socket = context.wrap_socket(sock, server_hostname=self.host)
+
+            # self._socket = wrappedSocket.create_connection((self.host, self.port), self._timeout)
+            self._socket.connect((self.host, self.port))
+        
+        
         # Initialization Handshake
         self._socket.sendall(INITIALIZATION_BYTES)
 
