@@ -16,6 +16,7 @@ import io
 import os
 import socket
 import struct
+import ssl
 import threading
 import logging
 ###
@@ -40,7 +41,7 @@ class Connection(object):
     """
     Database connection class
     """
-    def __init__(self, host, port, user, password, autocommit=False, timeout=None, data_format_version2 = False, ssl = None):
+    def __init__(self, host, port, user, password, autocommit=False, timeout=None, data_format_version2=False, sslsupport=False):
         self.host = host
         self.port = port
         self.user = user
@@ -56,7 +57,7 @@ class Connection(object):
         self._timeout = timeout
         
         self._data_format_version2 = data_format_version2
-        self._ssl = ssl
+        self._sslsupport = sslsupport
         
         self._auth_manager = AuthManager(self, user, password)
         # It feels like the RLock has a poorer performance
@@ -68,7 +69,7 @@ class Connection(object):
 
     def _open_socket_and_init_protocoll(self):
 
-        if not self._ssl:
+        if not self._sslsupport:
             #old style, no SSL
             self._socket = socket.create_connection((self.host, self.port), self._timeout)
         else:
@@ -76,9 +77,6 @@ class Connection(object):
             # CREATE SOCKET
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             
-            if self._timeout:
-                sock.settimeout(self._timeout)
-
             # SSL Context
             context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
             
