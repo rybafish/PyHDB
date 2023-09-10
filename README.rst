@@ -9,6 +9,8 @@ Such features include:
 * multiple resultsets support
 * fetch for over 32k rows
 * proper utf8 support
+* SSL support
+* long (!) SQL statements support
 * other minor fixes
 
 Unfortunately, SAP dicided to close the open-source version of the driver and those features were rejected to be merged in the standard one.
