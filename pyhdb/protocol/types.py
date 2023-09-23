@@ -562,7 +562,10 @@ class Longdate(Type):
         
         if microsec == 3155380704000000001:
             return None
-            
+
+        if microsec == 0:
+            return None
+                        
         microsec -= 1
             
         microsec = microsec // 10
@@ -677,6 +680,9 @@ class Daydate(Type):
         if day == 3652062:
             return None
             
+        if day == 0:    # date = ''
+            return None
+
         date = datetime.date.fromordinal(day - 2) # python uses 737425 while SAP HANA substracts 1721423
         
         return date
@@ -712,6 +718,9 @@ class Secondtime(Type):
     
         [second] = cls._struct.unpack(payload.read(4))
         
+        if second == 0:
+            return None
+
         second -= 1
 
         if second == 86401:
