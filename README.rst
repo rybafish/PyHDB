@@ -11,6 +11,7 @@ Such features include:
 * proper utf8 support
 * SSL support
 * long (!) SQL statements support
+* server processing time support
 * other minor fixes
 
 Unfortunately, SAP dicided to close the open-source version of the driver and those features were rejected to be merged in the standard one.
