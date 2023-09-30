@@ -26,6 +26,7 @@ import pyhdb
 from pyhdb.lib.stringlib import humanhexlify
 from pyhdb.protocol import types
 from pyhdb.protocol import constants
+from pyhdb.protocol.constants import statementcontext_codes
 from pyhdb.protocol.types import by_type_code
 from pyhdb.exceptions import InterfaceError, DatabaseError, DataError, IntegrityError
 from pyhdb.compat import is_text, iter_range, with_metaclass, string_types, byte_type
@@ -626,12 +627,26 @@ class StatementContext(Part):
 
     kind = constants.part_kinds.STATEMENTCONTEXT
 
-    def __init__(self, *args):
-        pass
+    def __init__(self, value):
+        self.value = value
 
     @classmethod
     def unpack_data(cls, argument_count, payload):
-        return tuple()
+        server_time = None
+        for i in iter_range(argument_count):
+            key, typ = struct.unpack('bb', payload.read(2))
+            
+            print(dir(constants))
+                        
+            if key == constants.statementcontext_codes.STATEMENTSEQUENCEINFO and typ == constants.type_codes.BSTRING:
+                l = struct.unpack('<h', payload.read(2))
+                _ = payload.read(l[0])
+                
+            if key == constants.statementcontext_codes.SERVERPROCESSINGTIME and typ == constants.type_codes.BIGINT:
+                val = struct.unpack('<q', payload.read(8))
+                server_time = val[0]
+        
+        return server_time,
 
 
 class FetchSize(Part):
