@@ -70,9 +70,9 @@ class AuthManager(object):
             )
             count = struct.unpack('>I', cnt)
 
-        proof = self.calculate_client_proof([salt], server_key, count[0])
+        self.client_proof = self.calculate_client_proof([salt], server_key, count[0])
 
-        return Authentication(self.user, {'SCRAMSHA256': self.client_proof})
+        return Authentication(self.user, {self.method: self.client_proof})
 
     def calculate_client_proof(self, salts, server_key, count):
         proof = b"\x00"
