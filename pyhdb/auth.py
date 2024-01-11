@@ -30,12 +30,15 @@ CLIENT_KEY_SIZE = 64
 
 class AuthManager(object):
 
-    def __init__(self, connection, user, password):
+    def __init__(self, connection, user, password, auth):
         self.connection = connection
         self.user = user
         self.password = password
 
-        self.method = b"SCRAMSHA256"
+        if auth == 'pbkdf2':
+            self.method = b"SCRAMPBKDF2SHA256"
+        else:
+            self.method = b"SCRAMSHA256"
         self.client_key = os.urandom(CLIENT_KEY_SIZE)
         self.client_proof = None
 
@@ -56,37 +59,48 @@ class AuthManager(object):
                 b",".join(auth_part.methods.keys())
             )
 
-        salt, server_key = Fields.unpack_data(
-            BytesIO(auth_part.methods[self.method])
-        )
+        count = None
+        if self.method == b"SCRAMSHA256":
+            salt, server_key = Fields.unpack_data(
+                BytesIO(auth_part.methods[self.method])
+            )
+        else:
+            salt, server_key, cnt = Fields.unpack_data(
+                BytesIO(auth_part.methods[self.method])
+            )
+            count = struct.unpack('>I', cnt)
 
-        self.client_proof = self.calculate_client_proof([salt], server_key)
+        proof = self.calculate_client_proof([salt], server_key, count[0])
+
         return Authentication(self.user, {'SCRAMSHA256': self.client_proof})
 
-    def calculate_client_proof(self, salts, server_key):
+    def calculate_client_proof(self, salts, server_key, count):
         proof = b"\x00"
         proof += struct.pack('b', len(salts))
 
         for salt in salts:
             proof += struct.pack('b', CLIENT_PROOF_SIZE)
-            proof += self.scramble_salt(salt, server_key)
+            proof += self.scramble_salt(salt, server_key, count)
 
         return proof
 
-    def scramble_salt(self, salt, server_key):
+    def scramble_salt(self, salt, server_key, count):
         msg = salt + server_key + self.client_key
 
-        key = hashlib.sha256(
-            hmac.new(
-                self.password.encode('utf-8'), salt, hashlib.sha256
-            ).digest()
-        ).digest()
+        if self.method == b"SCRAMSHA256":
+            key_salt = hmac.new(self.password.encode('utf-8'), salt, hashlib.sha256).digest()
+        elif self.method == b"SCRAMPBKDF2SHA256":
+            key_salt = hashlib.pbkdf2_hmac('sha256', self.password.encode('utf-8'), salt, count)
+        else:
+            raise Exception(f"Non implemented authentication method: {self.method}")
+
+        key = hashlib.sha256(key_salt).digest()
         key_hash = hashlib.sha256(key).digest()
 
         sig = hmac.new(
             key_hash, msg, hashlib.sha256
         ).digest()
-
+        
         return self._xor(sig, key)
 
     @staticmethod

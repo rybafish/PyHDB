@@ -41,7 +41,7 @@ class Connection(object):
     """
     Database connection class
     """
-    def __init__(self, host, port, user, password, autocommit=False, timeout=None, data_format_version2=False, sslsupport=False):
+    def __init__(self, host, port, user, password, autocommit=False, timeout=None, data_format_version2=False, sslsupport=False, auth=None):
         self.host = host
         self.port = port
         self.user = user
@@ -59,7 +59,7 @@ class Connection(object):
         self._data_format_version2 = data_format_version2
         self._sslsupport = sslsupport
         
-        self._auth_manager = AuthManager(self, user, password)
+        self._auth_manager = AuthManager(self, user, password, auth)
         # It feels like the RLock has a poorer performance
         self._socket_lock = threading.RLock()
         self._packet_count_lock = threading.Lock()
