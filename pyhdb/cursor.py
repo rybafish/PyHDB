@@ -134,6 +134,8 @@ class Cursor(object):
         self._executed_list = []
         self._buffer_list = []
         self._received_last_resultset_part_list = []
+        
+        self.servertime = None
 
     @property
     def prepared_statement_ids(self):
@@ -306,7 +308,8 @@ class Cursor(object):
             if part.kind == part_kinds.ROWSAFFECTED:
                 self.rowcount = part.values[0]
             elif part.kind == part_kinds.STATEMENTCONTEXT:
-                self.servertime = part.value
+                if part.value is not None:
+                    self.servertime = part.value
             elif part.kind in (part_kinds.TRANSACTIONFLAGS, part_kinds.PARAMETERMETADATA):
                 pass
             elif part.kind == part_kinds.WRITELOBREPLY:
@@ -367,7 +370,8 @@ class Cursor(object):
                 self._executed_list.append(self._executed)
                 
             elif part.kind == part_kinds.STATEMENTCONTEXT:
-                self.servertime = part.value
+                if part.value is not None:
+                    self.servertime = part.value
             elif part.kind in (part_kinds.TRANSACTIONFLAGS, part_kinds.PARAMETERMETADATA):
                 pass
             else:
@@ -381,7 +385,8 @@ class Cursor(object):
             elif part.kind == part_kinds.TRANSACTIONFLAGS:
                 pass
             elif part.kind == part_kinds.STATEMENTCONTEXT:
-                self.servertime = part.value
+                if part.value is not None:
+                    self.servertime = part.value
             elif part.kind == part_kinds.OUTPUTPARAMETERS:
                 self._buffer = part.unpack_rows(parameters_metadata, self.connection)
                 self._received_last_resultset_part = True
