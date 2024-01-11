@@ -635,8 +635,6 @@ class StatementContext(Part):
         server_time = None
         for i in iter_range(argument_count):
             key, typ = struct.unpack('bb', payload.read(2))
-            
-            print(dir(constants))
                         
             if key == constants.statementcontext_codes.STATEMENTSEQUENCEINFO and typ == constants.type_codes.BSTRING:
                 l = struct.unpack('<h', payload.read(2))
