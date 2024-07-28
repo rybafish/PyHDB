@@ -164,7 +164,10 @@ class Connection(object):
 
             # Perform the authenication handshake and get the part
             # with the agreed authentication data
+            
+            print('before handshake')
             agreed_auth_part = self._auth_manager.perform_handshake()
+            print('after handshake')
 
 
             connect_opt = DEFAULT_CONNECTION_OPTIONS.copy()
